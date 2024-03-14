@@ -1,14 +1,12 @@
 import tkinter as tk
 from tkinter import ttk
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 import time
 
 
 def create_gui():
     root = tk.Tk()
-    root.title("Friepaw's AI GUI")
+    root.title("Friepaw's EQ World Builder")
     root.geometry("400x150")
     root.config(bg="black")
     return root
