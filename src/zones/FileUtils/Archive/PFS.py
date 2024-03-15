@@ -60,6 +60,11 @@ def entry(src, cache, error_out):
 
         files = extract_files(pfs_data, file_count, dir_offset, error_out)
 
+        for i, file_data in enumerate(files):
+            file_path = os.path.join(cache, f"file_{i}.zlib")
+            with open(file_path, 'wb') as f:
+                f.write(file_data)
+
 
         return True
     except FileNotFoundError:
@@ -73,13 +78,13 @@ def get_int_at(pfs_data, offset):
 
     """
     Usage:
-        gets the file count of a PFS file in memory "pfs_data" by reading
-        a 32-bit Little Endian integer at the location "dir_offset"
+        gets the integer interpretation of a PFS file in memory "pfs_data" by reading
+        a 32-bit Little Endian integer at the location "offset"
     Args:
         pfs_data: PFS file in memory to be read.
-        dir_offset: Location where file count should be stored
+        offset: Location where integer to be read can be found.
     Returns:
-        int_out: integer value found at "dir_offset" in "pfs_data"
+        int_out: integer value found at location "offset" in "pfs_data"
     """
 
     return hu.LEHexStringToInt(binascii.hexlify(
