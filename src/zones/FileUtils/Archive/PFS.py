@@ -17,7 +17,7 @@ def entry(src, cache, error_out):
 
     """
     Important Notes:
-        All eq compressed files: .EQG, .PAK, .PFS(obviously), and .PFS are PFS.
+        All eq compressed files: .EQG, .PAK, .PFS(obviously), and .S3d are PFS.
         Individual portions of PFS are compressed by z-lib, but not the entire file.
         This function is the intended entry point for this Python file.
         This function creates a cache folder if given a nonexistent folder.
@@ -25,7 +25,7 @@ def entry(src, cache, error_out):
         EQG -
         PAK -
         PFS -
-        PFS -
+        S3D -
 
     Usage:
         Given a PFS file "src" it will extract the contents to directory "cache"
@@ -157,6 +157,7 @@ def extract_files(pfs_data, file_count, dir_offset, error_out):
             return None
         file_size = get_int_at(pfs_data, pointer) + ZLIB_HEADER_LENGTH
         file_data = pfs_data[pointer:pointer + file_size]
+        print(binascii.hexlify(pfs_data[pointer:pointer+8]).decode('utf-8'))
         files.append(file_data)
         pointer += file_size
 
