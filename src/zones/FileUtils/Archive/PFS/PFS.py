@@ -10,6 +10,7 @@ FOOTER_TOKEN = "STEVE"              # WHO'S STEVE?!?
 PFS_HEADER_LENGTH = 12              # in bytes
 ZLIB_HEADER_LENGTH = 8              # in bytes
 EXPECTED_VERSION = ["00020000"]     # May be expanded upon in the future
+UINT32_SIZE = 8
 
 
 def entry(src, cache, error_out):
@@ -58,7 +59,7 @@ def entry(src, cache, error_out):
         file_count = getIntAt(pfs_data, dir_offset)
         crc, offset, file_size = readMetaData(pfs_data, dir_offset, file_count)
 
-        files = extractFiles(pfs_data, file_count, dir_offset, error_out)
+        files = extractFiles(pfs_data, file_count, file_size, dir_offset, error_out)
 
         file_names = extractNames(pfs_data, file_count, crc, error_out)
 
@@ -156,9 +157,19 @@ def readMetaData(pfs_data, dir_offset, file_count):
         file_size:  The size of the respective file stored at that index.
     """
 
+    crc, offset, file_size = [] * file_count
+    pointer = dir_offset + UINT32_SIZE
+    for i in range(file_count):
+        crc[i] = getIntAt(pfs_data, pointer)
+        offset[i] = getIntAt(pfs_data, pointer + UINT32_SIZE)
+        file_size[i] = getIntAt(pfs_data, pointer + 2 * UINT32_SIZE)
+        pointer += 3 * UINT32_SIZE
 
-def extractFiles(pfs_data, file_count, dir_offset, error_out):
-    # Helldiver, we can't stay this low much longer!
+    return crc, offset, file_size
+
+
+def extractFiles(pfs_data, file_count, file_size, dir_offset, error_out):
+    # FOR DEMOCRACY!!!
 
     """
     Usage:
@@ -169,6 +180,7 @@ def extractFiles(pfs_data, file_count, dir_offset, error_out):
     Args:
         pfs_data: PFS file stored in memory.
         file_count: Number of files expected to be in "pfs_data".
+        file_size: An array of sizes for each index in "file_count".
         dir_offset: The file pointer should never be greater than "dir_offset".
         error_out: Text box containing errors in the GUI.
 
@@ -178,24 +190,26 @@ def extractFiles(pfs_data, file_count, dir_offset, error_out):
                 probably a malformed file, or corrupted header.
     """
 
-    files = []
+    files = [""] * file_count
     pointer = PFS_HEADER_LENGTH
-    for _ in range(file_count):
-        if pointer > dir_offset:
-            print("Error 1105: File pointer exceeds directory offset")
-            # wu.write_to_textbox(error_out, "Error 1105: File pointer exceeds directory offset")
-            return None
-        file_size = getIntAt(pfs_data, pointer) + ZLIB_HEADER_LENGTH
-        file_data = pfs_data[pointer + ZLIB_HEADER_LENGTH:pointer + ZLIB_HEADER_LENGTH + file_size]
-        print(binascii.hexlify(pfs_data[pointer + ZLIB_HEADER_LENGTH:pointer + ZLIB_HEADER_LENGTH + 4]).decode('utf-8'))
-        files.append(file_data)
-        pointer += file_size
+    for i in range(file_count):
+        extraction = 0
+        base = pointer
+        while extraction < file_size[i]:
+            if pointer > dir_offset:
+                print("Error 1105: File pointer exceeds directory offset")
+                # wu.write_to_textbox(error_out, "Error 1105: File pointer exceeds directory offset")
+                return None
+            size = getIntAt(pfs_data, pointer) + ZLIB_HEADER_LENGTH
+            file_data = pfs_data[pointer + ZLIB_HEADER_LENGTH:pointer + ZLIB_HEADER_LENGTH + size]
+            files[i] += file_data
+            pointer += size
+            extraction += size
 
     return files
 
 
 def extractNames(pfs_data, file_count, crc, error_out):
-    # FOR DEMOCRACY!!!
 
     """
     Usage:
