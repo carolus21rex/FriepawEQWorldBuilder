@@ -1,16 +1,15 @@
 import os
 import binascii
-import zlib
-from src.zones.FileUtils.Archive.crc32Table import FilenameCRC
 import src.zones.HexUtil as hu
 import src.GUI.WindowsUtil as wu
 
 
 # Constant Table
-PFS_MAGIC_NUMBER = "50465320"   # "PFS " in hex
-FOOTER_TOKEN = "STEVE"          # WHO'S STEVE?!?
-PFS_HEADER_LENGTH = 12
-ZLIB_HEADER_LENGTH = 8
+PFS_MAGIC_NUMBER = "50465320"       # "PFS " in hex
+FOOTER_TOKEN = "STEVE"              # WHO'S STEVE?!?
+PFS_HEADER_LENGTH = 12              # in bytes
+ZLIB_HEADER_LENGTH = 8              # in bytes
+EXPECTED_VERSION = ["00020000"]     # May be expanded upon in the future
 
 
 def entry(src, cache, error_out):
@@ -56,15 +55,17 @@ def entry(src, cache, error_out):
         dir_offset = hu.LEHexStringToInt(pfs_header[0])
 
         # file count, reads 8 bytes after the dir offset as an integer.
-        file_count = get_int_at(pfs_data, dir_offset)
+        file_count = getIntAt(pfs_data, dir_offset)
+        crc, offset, file_size = readMetaData(pfs_data, dir_offset, file_count)
 
-        files = extract_files(pfs_data, file_count, dir_offset, error_out)
+        files = extractFiles(pfs_data, file_count, dir_offset, error_out)
+
+        file_names = extractNames(pfs_data, file_count, crc, error_out)
 
         for i, file_data in enumerate(files):
-            file_path = os.path.join(cache, f"file_{i}.zlib")
+            file_path = os.path.join(cache, f"{file_names[i]}.zlib")
             with open(file_path, 'wb') as f:
                 f.write(file_data)
-
 
         return True
     except FileNotFoundError:
@@ -74,7 +75,7 @@ def entry(src, cache, error_out):
     return False
 
 
-def get_int_at(pfs_data, offset):
+def getIntAt(pfs_data, offset):
 
     """
     Usage:
@@ -123,11 +124,40 @@ def readHeader(pfs_data, error_out):
         print("Error 1101: Incorrect Magic Number.")
         return None
 
+    if header_hex[2] not in EXPECTED_VERSION:
+        # wu.write_to_textbox(error_out, "Error 1106: Unexpected version.")
+        print("Error 1106: Unexpected version.")
+        return None
+
     # debug: print(header_hex)
     return header_hex
 
 
-def extract_files(pfs_data, file_count, dir_offset, error_out):
+def readMetaData(pfs_data, dir_offset, file_count):
+
+    """
+    Usage:
+        Given a PFS_File in memory "pfs_data", the location to start looking at "dir_offset",
+        and the number of files "file_count" this function will return all the required metadata
+        in the form of 3 arrays, the crc numbers for file name recovery "crc", the offset where a
+        file begins "offset" (redundancy, but doesn't hurt), and the size of the file "file_size"
+        which is used to determine how many zlib segments the function "extractFiles" needs to
+        pull out of pfs_data to have a completed file.
+    Args:
+        pfs_data:   PFS file stored in memory.
+        dir_offset: The location that delimits raw data from meta_data, will need to be incremented
+                    since the location dir_offset is pointed at is "file_count" which is already
+                    accounted for.
+        file_count: The number of files, or for this function's purposes the count of metadata segments
+                    that need to be pulled out of "pfs_data".
+    Return:
+        crc:        Used to obtain the name of the respective file.
+        offset:     Where the respective file is stored in "pfs_data".
+        file_size:  The size of the respective file stored at that index.
+    """
+
+
+def extractFiles(pfs_data, file_count, dir_offset, error_out):
     # Helldiver, we can't stay this low much longer!
 
     """
@@ -138,9 +168,9 @@ def extract_files(pfs_data, file_count, dir_offset, error_out):
 
     Args:
         pfs_data: PFS file stored in memory.
-        error_out: Text box containing errors in the GUI.
         file_count: Number of files expected to be in "pfs_data".
         dir_offset: The file pointer should never be greater than "dir_offset".
+        error_out: Text box containing errors in the GUI.
 
     Returns:
         files:  Success, an array in memory containing each individual zlib file.
@@ -155,10 +185,33 @@ def extract_files(pfs_data, file_count, dir_offset, error_out):
             print("Error 1105: File pointer exceeds directory offset")
             # wu.write_to_textbox(error_out, "Error 1105: File pointer exceeds directory offset")
             return None
-        file_size = get_int_at(pfs_data, pointer) + ZLIB_HEADER_LENGTH
-        file_data = pfs_data[pointer:pointer + file_size]
-        print(binascii.hexlify(pfs_data[pointer:pointer+8]).decode('utf-8'))
+        file_size = getIntAt(pfs_data, pointer) + ZLIB_HEADER_LENGTH
+        file_data = pfs_data[pointer + ZLIB_HEADER_LENGTH:pointer + ZLIB_HEADER_LENGTH + file_size]
+        print(binascii.hexlify(pfs_data[pointer + ZLIB_HEADER_LENGTH:pointer + ZLIB_HEADER_LENGTH + 4]).decode('utf-8'))
         files.append(file_data)
         pointer += file_size
 
     return files
+
+
+def extractNames(pfs_data, file_count, crc, error_out):
+    # FOR DEMOCRACY!!!
+
+    """
+    Usage:
+        Given a PFS file in memory "pfs_data" and the number of files
+        to be extracted "file_count" it will read "file_count" number of names
+        from "pfs_data" and return an array of those names in memory.
+
+    Args:
+        pfs_data:
+        file_count:
+        crc:
+        error_out: Text box containing errors in the GUI.
+
+    Returns:
+        files:  Success, an array in memory containing the names of each zlib file.
+        None:   Failure, names are probably corrupted.
+    """
+
+    pass
